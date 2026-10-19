@@ -1,0 +1,14 @@
+item-actions:
+  teleport_wand:
+    trigger: RIGHT_CLICK
+    permission: "advancedcraft.items.teleport_wand.use"
+    cooldown-seconds: 5
+    consume-item: false
+    commands:
+      - executor: CONSOLE
+        command: "say {player} activated the Teleport Wand!"
+      - executor: PLAYER
+        command: "spawn"
+    messages:
+      no-permission: "<red>You do not have permission to use the Teleport Wand.</red>"
+      cooldown: "<yellow>Please wait {seconds} second(s) before using the Teleport Wand again.</yellow>"

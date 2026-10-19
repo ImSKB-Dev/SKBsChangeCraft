@@ -1,0 +1,41 @@
+items:
+  ruby:
+    material: EMERALD
+    name: "<red><bold>Ruby Gem</bold></red>"
+    lore:
+      - "<gray>A precious gleaming ruby gem."
+      - "<dark_red>Crafting Ingredient"
+    custom-model-data: 1001
+
+  ruby_sword:
+    material: NETHERITE_SWORD
+    name: "<gradient:#ff3030:#ff9900>Ruby Sword</gradient>"
+    lore:
+      - "<gray>A powerful custom weapon forged from rubies."
+      - "<dark_red>Legendary Item"
+    unbreakable: true
+    custom-model-data: 10001
+    permissions:
+      obtain: "advancedcraft.items.ruby_sword.obtain"
+      use: "advancedcraft.items.ruby_sword.use"
+
+  magic_crystal:
+    material: AMETHYST_SHARD
+    name: "<purple><bold>Magic Crystal</bold></purple>"
+    lore:
+      - "<gray>Pulsating with mysterious magical power."
+    custom-model-data: 2001
+
+  magic_key:
+    material: TRIPWIRE_HOOK
+    name: "<gold><bold>Magic Key</bold></gold>"
+    lore:
+      - "<yellow>Unlocks ancient mystical barriers."
+    custom-model-data: 2002
+
+  teleport_wand:
+    material: BLAZE_ROD
+    name: "<light_purple><bold>Teleport Wand</bold></light_purple>"
+    lore:
+      - "<gray>Right click to warp to spawn!"
+    custom-model-data: 3001

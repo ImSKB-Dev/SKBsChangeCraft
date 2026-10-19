@@ -1,0 +1,62 @@
+name: AdvancedCraft
+version: ${project.version}
+main: com.advancedcraft.AdvancedCraftPlugin
+api-version: '1.21'
+author: AdvancedCraft
+description: Custom Items, Crafting GUI & Item Abilities Plugin
+
+commands:
+  craft:
+    description: Open the custom crafting GUI
+    usage: /craft
+    aliases: [cmenu]
+    permission: advancedcraft.use
+  customcraft:
+    description: Main command for AdvancedCraft
+    usage: /customcraft <subcommand>
+    aliases: [cc, ac]
+    permission: advancedcraft.use
+
+permissions:
+  advancedcraft.use:
+    description: Allows opening crafting GUI and viewing basic plugin help
+    default: true
+  advancedcraft.admin:
+    description: Grants full administrative access to AdvancedCraft
+    default: op
+  advancedcraft.reload:
+    description: Allows reloading AdvancedCraft configuration files
+    default: op
+  advancedcraft.give:
+    description: Allows giving custom items to players
+    default: op
+  advancedcraft.items.list:
+    description: Allows listing custom items
+    default: op
+  advancedcraft.recipes.list:
+    description: Allows listing custom recipes
+    default: op
+  advancedcraft.lore:
+    description: Allows access to lore management commands
+    default: op
+  advancedcraft.lore.add:
+    description: Allows adding lore lines
+    default: op
+  advancedcraft.lore.insert:
+    description: Allows inserting lore lines
+    default: op
+  advancedcraft.lore.set:
+    description: Allows setting lore lines
+    default: op
+  advancedcraft.lore.remove:
+    description: Allows removing lore lines
+    default: op
+  advancedcraft.lore.clear:
+    description: Allows clearing item lore
+    default: op
+  advancedcraft.lore.show:
+    description: Allows showing item lore line numbers
+    default: op
+  advancedcraft.lore.replace:
+    description: Allows replacing entire item lore
+    default: op

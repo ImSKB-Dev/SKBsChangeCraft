@@ -1,0 +1,5 @@
+prefix: "<gradient:#4158D0:#C850C0>[AdvancedCraft]</gradient> "
+no-permission: "<red>You do not have permission to execute this command.</red>"
+command-success: "<green>Operation completed successfully.</green>"
+reload-success: "<green>AdvancedCraft configuration reloaded successfully.</green>"
+item-given: "<green>Given {amount}x {item} to {player}.</green>"

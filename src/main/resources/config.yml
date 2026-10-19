@@ -1,0 +1,3 @@
+settings:
+  op-bypass-permissions: true
+  debug: false

@@ -1,0 +1,35 @@
+recipes:
+  ruby_sword_recipe:
+    type: SHAPED
+    permission: "advancedcraft.craft.ruby_sword"
+    shape:
+      - " R "
+      - " R "
+      - " S "
+    ingredients:
+      R:
+        type: CUSTOM_ITEM
+        id: ruby
+        amount: 1
+      S:
+        type: MATERIAL
+        material: STICK
+        amount: 1
+    result:
+      type: CUSTOM_ITEM
+      id: ruby_sword
+      amount: 1
+
+  magic_key_recipe:
+    type: SHAPELESS
+    ingredients:
+      - type: MATERIAL
+        material: GOLD_INGOT
+        amount: 4
+      - type: CUSTOM_ITEM
+        id: magic_crystal
+        amount: 1
+    result:
+      type: CUSTOM_ITEM
+      id: magic_key
+      amount: 1
