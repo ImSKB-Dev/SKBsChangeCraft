@@ -47,6 +47,11 @@ public class RecipeRegistry {
         customItems.put(item.getId(), item);
     }
 
+    public boolean removeCustomItem(String id) {
+        if (id == null) return false;
+        return customItems.remove(id.toLowerCase(Locale.ROOT)) != null;
+    }
+
     public Optional<CustomItemDefinition> getCustomItem(String id) {
         if (id == null) return Optional.empty();
         return Optional.ofNullable(customItems.get(id.toLowerCase(Locale.ROOT)));

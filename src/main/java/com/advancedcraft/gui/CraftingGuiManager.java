@@ -10,13 +10,18 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.*;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 
@@ -24,6 +29,8 @@ import java.util.*;
 
 /**
  * Manages the custom crafting GUI and handles secure inventory interactions.
+ * Includes tool modifier buttons for adjusting Unbreakable state, Fortune level,
+ * Attack Damage attribute, and Durability/Damage repair on crafted result items.
  */
 public class CraftingGuiManager implements Listener {
 
@@ -38,6 +45,12 @@ public class CraftingGuiManager implements Listener {
     public static final int RESULT_SLOT = 24;
     public static final int CRAFT_BUTTON_SLOT = 23;
     public static final int CLEAR_BUTTON_SLOT = 25;
+
+    // Tool Modifier Button Slots
+    public static final int TOGGLE_UNBREAKABLE_SLOT = 41;
+    public static final int CYCLE_FORTUNE_SLOT = 42;
+    public static final int ADD_DAMAGE_SLOT = 43;
+    public static final int REPAIR_DURABILITY_SLOT = 44;
 
     private final Set<UUID> openGuiSessions = Collections.synchronizedSet(new HashSet<>());
 
@@ -65,25 +78,69 @@ public class CraftingGuiManager implements Listener {
         openGuiSessions.clear();
     }
 
+    public boolean validateGui(Inventory inv) {
+        if (inv == null || inv.getSize() != 54) {
+            return false;
+        }
+
+        ItemStack craftBtn = inv.getItem(CRAFT_BUTTON_SLOT);
+        if (craftBtn == null || craftBtn.getType() != Material.NETHER_STAR) {
+            return false;
+        }
+
+        ItemStack clearBtn = inv.getItem(CLEAR_BUTTON_SLOT);
+        if (clearBtn == null || clearBtn.getType() != Material.BARRIER) {
+            return false;
+        }
+
+        Set<Integer> interactiveSlots = new HashSet<>();
+        for (int slot : GRID_SLOTS) interactiveSlots.add(slot);
+        interactiveSlots.add(RESULT_SLOT);
+        interactiveSlots.add(CRAFT_BUTTON_SLOT);
+        interactiveSlots.add(CLEAR_BUTTON_SLOT);
+        interactiveSlots.add(TOGGLE_UNBREAKABLE_SLOT);
+        interactiveSlots.add(CYCLE_FORTUNE_SLOT);
+        interactiveSlots.add(ADD_DAMAGE_SLOT);
+        interactiveSlots.add(REPAIR_DURABILITY_SLOT);
+
+        for (int i = 0; i < 54; i++) {
+            if (!interactiveSlots.contains(i)) {
+                ItemStack filler = inv.getItem(i);
+                if (filler == null || filler.getType() != Material.BLACK_STAINED_GLASS_PANE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private void fillDecorativeGlass(Inventory inv) {
-        ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        ItemStack filler = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         ItemMeta meta = filler.getItemMeta();
         if (meta != null) {
             meta.displayName(Component.empty());
             filler.setItemMeta(meta);
         }
 
-        Set<Integer> gridSet = new HashSet<>();
-        for (int slot : GRID_SLOTS) gridSet.add(slot);
+        Set<Integer> interactiveSlots = new HashSet<>();
+        for (int slot : GRID_SLOTS) interactiveSlots.add(slot);
+        interactiveSlots.add(RESULT_SLOT);
+        interactiveSlots.add(CRAFT_BUTTON_SLOT);
+        interactiveSlots.add(CLEAR_BUTTON_SLOT);
+        interactiveSlots.add(TOGGLE_UNBREAKABLE_SLOT);
+        interactiveSlots.add(CYCLE_FORTUNE_SLOT);
+        interactiveSlots.add(ADD_DAMAGE_SLOT);
+        interactiveSlots.add(REPAIR_DURABILITY_SLOT);
 
         for (int i = 0; i < 54; i++) {
-            if (!gridSet.contains(i) && i != RESULT_SLOT && i != CRAFT_BUTTON_SLOT && i != CLEAR_BUTTON_SLOT) {
+            if (!interactiveSlots.contains(i)) {
                 inv.setItem(i, filler);
             }
         }
     }
 
     private void setupButtons(Inventory inv) {
+        // Craft Button
         ItemStack craftBtn = new ItemStack(Material.NETHER_STAR);
         ItemMeta cMeta = craftBtn.getItemMeta();
         if (cMeta != null) {
@@ -93,6 +150,7 @@ public class CraftingGuiManager implements Listener {
         }
         inv.setItem(CRAFT_BUTTON_SLOT, craftBtn);
 
+        // Clear Grid Button
         ItemStack clearBtn = new ItemStack(Material.BARRIER);
         ItemMeta clMeta = clearBtn.getItemMeta();
         if (clMeta != null) {
@@ -101,6 +159,46 @@ public class CraftingGuiManager implements Listener {
             clearBtn.setItemMeta(clMeta);
         }
         inv.setItem(CLEAR_BUTTON_SLOT, clearBtn);
+
+        // Tool Modifier: Toggle Unbreakable
+        ItemStack unbBtn = new ItemStack(Material.ANVIL);
+        ItemMeta unbMeta = unbBtn.getItemMeta();
+        if (unbMeta != null) {
+            unbMeta.displayName(miniMessage.deserialize("<gold><bold>Toggle Unbreakable</bold></gold>"));
+            unbMeta.lore(List.of(miniMessage.deserialize("<gray>Toggle unbreakable status on crafted result item.</gray>")));
+            unbBtn.setItemMeta(unbMeta);
+        }
+        inv.setItem(TOGGLE_UNBREAKABLE_SLOT, unbBtn);
+
+        // Tool Modifier: Cycle Fortune
+        ItemStack fortBtn = new ItemStack(Material.ENCHANTED_BOOK);
+        ItemMeta fortMeta = fortBtn.getItemMeta();
+        if (fortMeta != null) {
+            fortMeta.displayName(miniMessage.deserialize("<purple><bold>Cycle Fortune Level</bold></purple>"));
+            fortMeta.lore(List.of(miniMessage.deserialize("<gray>Cycle Fortune enchantment level (0 to 3) on result item.</gray>")));
+            fortBtn.setItemMeta(fortMeta);
+        }
+        inv.setItem(CYCLE_FORTUNE_SLOT, fortBtn);
+
+        // Tool Modifier: Add Attack Damage
+        ItemStack dmgBtn = new ItemStack(Material.DIAMOND_SWORD);
+        ItemMeta dmgMeta = dmgBtn.getItemMeta();
+        if (dmgMeta != null) {
+            dmgMeta.displayName(miniMessage.deserialize("<red><bold>Add +2 Attack Damage</bold></red>"));
+            dmgMeta.lore(List.of(miniMessage.deserialize("<gray>Add +2 attack damage attribute modifier to result item.</gray>")));
+            dmgBtn.setItemMeta(dmgMeta);
+        }
+        inv.setItem(ADD_DAMAGE_SLOT, dmgBtn);
+
+        // Tool Modifier: Repair Durability
+        ItemStack repBtn = new ItemStack(Material.EXPERIENCE_BOTTLE);
+        ItemMeta repMeta = repBtn.getItemMeta();
+        if (repMeta != null) {
+            repMeta.displayName(miniMessage.deserialize("<aqua><bold>Repair Item</bold></aqua>"));
+            repMeta.lore(List.of(miniMessage.deserialize("<gray>Full durability repair on result item.</gray>")));
+            repBtn.setItemMeta(repMeta);
+        }
+        inv.setItem(REPAIR_DURABILITY_SLOT, repBtn);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -126,6 +224,14 @@ public class CraftingGuiManager implements Listener {
                     clearGrid(player, topInv);
                 } else if (rawSlot == RESULT_SLOT) {
                     claimCraftedResult(player, topInv);
+                } else if (rawSlot == TOGGLE_UNBREAKABLE_SLOT) {
+                    handleToggleUnbreakable(player, topInv);
+                } else if (rawSlot == CYCLE_FORTUNE_SLOT) {
+                    handleCycleFortune(player, topInv);
+                } else if (rawSlot == ADD_DAMAGE_SLOT) {
+                    handleAddAttackDamage(player, topInv);
+                } else if (rawSlot == REPAIR_DURABILITY_SLOT) {
+                    handleRepairDurability(player, topInv);
                 }
                 return;
             }
@@ -150,6 +256,77 @@ public class CraftingGuiManager implements Listener {
             if (!isGridSlot(rawSlot)) {
                 event.setCancelled(true);
             }
+        }
+    }
+
+    private void handleToggleUnbreakable(Player player, Inventory inv) {
+        ItemStack result = inv.getItem(RESULT_SLOT);
+        if (result == null || result.getType().isAir()) {
+            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            return;
+        }
+        ItemMeta meta = result.getItemMeta();
+        if (meta != null) {
+            boolean currentState = meta.isUnbreakable();
+            meta.setUnbreakable(!currentState);
+            result.setItemMeta(meta);
+            player.sendMessage(Component.text("Unbreakable status toggled: " + (!currentState), NamedTextColor.GREEN));
+        }
+    }
+
+    private void handleCycleFortune(Player player, Inventory inv) {
+        ItemStack result = inv.getItem(RESULT_SLOT);
+        if (result == null || result.getType().isAir()) {
+            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            return;
+        }
+        ItemMeta meta = result.getItemMeta();
+        if (meta != null) {
+            int currentLevel = meta.getEnchantLevel(Enchantment.FORTUNE);
+            int newLevel = (currentLevel >= 3) ? 0 : currentLevel + 1;
+            if (newLevel == 0) {
+                meta.removeEnchant(Enchantment.FORTUNE);
+            } else {
+                meta.addEnchant(Enchantment.FORTUNE, newLevel, true);
+            }
+            result.setItemMeta(meta);
+            player.sendMessage(Component.text("Fortune level set to: " + newLevel, NamedTextColor.GREEN));
+        }
+    }
+
+    private void handleAddAttackDamage(Player player, Inventory inv) {
+        ItemStack result = inv.getItem(RESULT_SLOT);
+        if (result == null || result.getType().isAir()) {
+            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            return;
+        }
+        ItemMeta meta = result.getItemMeta();
+        if (meta != null) {
+            AttributeModifier modifier = new AttributeModifier(
+                    org.bukkit.NamespacedKey.minecraft("custom_attack_damage"),
+                    2.0,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    EquipmentSlotGroup.MAINHAND
+            );
+            meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, modifier);
+            result.setItemMeta(meta);
+            player.sendMessage(Component.text("Added +2 Attack Damage attribute modifier.", NamedTextColor.GREEN));
+        }
+    }
+
+    private void handleRepairDurability(Player player, Inventory inv) {
+        ItemStack result = inv.getItem(RESULT_SLOT);
+        if (result == null || result.getType().isAir()) {
+            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            return;
+        }
+        ItemMeta meta = result.getItemMeta();
+        if (meta instanceof Damageable damageable) {
+            damageable.setDamage(0);
+            result.setItemMeta(meta);
+            player.sendMessage(Component.text("Full durability repair applied to result item.", NamedTextColor.GREEN));
+        } else {
+            player.sendMessage(Component.text("Result item does not possess durability.", NamedTextColor.YELLOW));
         }
     }
 

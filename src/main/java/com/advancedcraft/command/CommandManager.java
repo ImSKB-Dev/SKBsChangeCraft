@@ -80,6 +80,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
             switch (sub) {
                 case "menu" -> handleMenu(sender);
                 case "give" -> handleGive(sender, args);
+                case "remove" -> handleRemoveItem(sender, args);
                 case "items" -> handleItems(sender);
                 case "recipes" -> handleRecipes(sender);
                 case "recipe" -> handleRecipeInfo(sender, args);
@@ -153,6 +154,26 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 
         sender.sendMessage(Component.text("Gave " + amount + "x " + itemId + " to " + target.getName() + ".", NamedTextColor.GREEN));
         target.sendMessage(Component.text("You received " + amount + "x " + itemId + ".", NamedTextColor.GREEN));
+    }
+
+    private void handleRemoveItem(CommandSender sender, String[] args) {
+        if (sender instanceof Player player && !permissionService.hasPermission(player, "advancedcraft.remove")) {
+            sender.sendMessage(Component.text("You do not have permission to remove custom items.", NamedTextColor.RED));
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /customcraft remove <itemId>", NamedTextColor.YELLOW));
+            return;
+        }
+
+        String itemId = args[1].toLowerCase(Locale.ROOT);
+        boolean removed = recipeRegistry.removeCustomItem(itemId);
+        if (removed) {
+            sender.sendMessage(Component.text("Removed custom item: " + itemId, NamedTextColor.GREEN));
+        } else {
+            sender.sendMessage(Component.text("Custom item not found: " + itemId, NamedTextColor.RED));
+        }
     }
 
     private void handleItems(CommandSender sender) {
@@ -239,6 +260,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("=== AdvancedCraft Help ===", NamedTextColor.GOLD));
         sender.sendMessage(Component.text("/craft or /customcraft menu - Open Crafting GUI", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/customcraft give <player> <itemId> [amount] - Give custom item", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/customcraft remove <itemId> - Remove registered custom item", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/customcraft items - List registered custom items", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/customcraft recipes - List registered recipes", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/customcraft recipe <recipeId> - Show recipe details", NamedTextColor.YELLOW));
@@ -255,7 +277,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 1) {
-            List<String> subcommands = List.of("menu", "give", "items", "recipes", "recipe", "reload", "version", "lore");
+            List<String> subcommands = List.of("menu", "give", "remove", "items", "recipes", "recipe", "reload", "version", "lore");
             return filterPrefix(subcommands, args[0]);
         }
 
@@ -267,6 +289,9 @@ public class CommandManager implements CommandExecutor, TabCompleter {
                     players.add(p.getName());
                 }
                 return filterPrefix(players, args[1]);
+            } else if (sub.equals("remove")) {
+                List<String> items = new ArrayList<>(recipeRegistry.getAllCustomItems().keySet());
+                return filterPrefix(items, args[1]);
             } else if (sub.equals("recipe")) {
                 List<String> recipes = new ArrayList<>();
                 recipes.addAll(recipeRegistry.getShapedRecipes().keySet());

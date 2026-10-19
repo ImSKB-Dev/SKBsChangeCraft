@@ -30,6 +30,9 @@ permissions:
   advancedcraft.give:
     description: Allows giving custom items to players
     default: op
+  advancedcraft.remove:
+    description: Allows removing custom items
+    default: op
   advancedcraft.items.list:
     description: Allows listing custom items
     default: op

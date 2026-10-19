@@ -1,8 +1,10 @@
 package com.advancedcraft;
 
+import com.advancedcraft.gui.CraftingGuiManager;
 import com.advancedcraft.model.CustomIngredient;
 import com.advancedcraft.model.CustomItemDefinition;
 import com.advancedcraft.model.ShapedRecipeDefinition;
+import com.advancedcraft.service.ItemIdentifierService;
 import com.advancedcraft.service.LoreService;
 import com.advancedcraft.service.PermissionService;
 import com.advancedcraft.service.RecipeRegistry;
@@ -59,6 +61,34 @@ class AdvancedCraftUnitTest {
     }
 
     @Test
+    void testRemoveCustomItem() {
+        RecipeRegistry registry = new RecipeRegistry(plugin, Mockito.mock(ItemIdentifierService.class));
+        CustomItemDefinition item = new CustomItemDefinition(
+                "test_item",
+                Material.DIAMOND,
+                "Test",
+                Collections.emptyList(),
+                null,
+                Collections.emptyMap(),
+                Collections.emptySet(),
+                false,
+                null,
+                null,
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                null,
+                null
+        );
+
+        registry.registerCustomItem(item);
+        assertTrue(registry.getCustomItem("test_item").isPresent());
+
+        boolean removed = registry.removeCustomItem("test_item");
+        assertTrue(removed);
+        assertFalse(registry.getCustomItem("test_item").isPresent());
+    }
+
+    @Test
     void testCustomIngredientMatchingModes() {
         CustomIngredient vanillaIng = CustomIngredient.ofMaterial(Material.GOLD_INGOT, 4);
         assertEquals(CustomIngredient.MatchingMode.MATERIAL, vanillaIng.getMode());
@@ -106,7 +136,7 @@ class AdvancedCraftUnitTest {
                 """;
 
         YamlConfiguration config = YamlConfiguration.loadConfiguration(new StringReader(yamlContent));
-        RecipeRegistry registry = new RecipeRegistry(plugin, Mockito.mock(com.advancedcraft.service.ItemIdentifierService.class));
+        RecipeRegistry registry = new RecipeRegistry(plugin, Mockito.mock(ItemIdentifierService.class));
         registry.loadItemsFromConfig(config);
 
         assertTrue(registry.getCustomItem("ruby_sword").isPresent());
@@ -143,7 +173,7 @@ class AdvancedCraftUnitTest {
                 """;
 
         YamlConfiguration config = YamlConfiguration.loadConfiguration(new StringReader(yamlContent));
-        RecipeRegistry registry = new RecipeRegistry(plugin, Mockito.mock(com.advancedcraft.service.ItemIdentifierService.class));
+        RecipeRegistry registry = new RecipeRegistry(plugin, Mockito.mock(ItemIdentifierService.class));
         registry.loadRecipesFromConfig(config);
 
         assertEquals(1, registry.getShapedRecipes().size());
