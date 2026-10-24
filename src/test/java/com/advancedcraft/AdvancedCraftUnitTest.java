@@ -89,6 +89,15 @@ class AdvancedCraftUnitTest {
     }
 
     @Test
+    void testConfigurableResultSlotInGuiManager() {
+        CraftingGuiManager guiManager = new CraftingGuiManager(plugin, Mockito.mock(RecipeRegistry.class), Mockito.mock(ItemIdentifierService.class));
+        assertEquals(24, guiManager.getResultSlot());
+
+        guiManager.setResultSlot(31);
+        assertEquals(31, guiManager.getResultSlot());
+    }
+
+    @Test
     void testCustomIngredientMatchingModes() {
         CustomIngredient vanillaIng = CustomIngredient.ofMaterial(Material.GOLD_INGOT, 4);
         assertEquals(CustomIngredient.MatchingMode.MATERIAL, vanillaIng.getMode());

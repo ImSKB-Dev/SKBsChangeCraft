@@ -29,8 +29,7 @@ import java.util.*;
 
 /**
  * Manages the custom crafting GUI and handles secure inventory interactions.
- * Includes tool modifier buttons for adjusting Unbreakable state, Fortune level,
- * Attack Damage attribute, and Durability/Damage repair on crafted result items.
+ * Configurable result slot allowing server administrators to choose where the output item is located.
  */
 public class CraftingGuiManager implements Listener {
 
@@ -42,11 +41,10 @@ public class CraftingGuiManager implements Listener {
     public static final String GUI_TITLE = "<gradient:#4158D0:#C850C0>Custom Crafting Table</gradient>";
 
     public static final int[] GRID_SLOTS = {10, 11, 12, 19, 20, 21, 28, 29, 30};
-    public static final int RESULT_SLOT = 24;
+    private int resultSlot = 24;
     public static final int CRAFT_BUTTON_SLOT = 23;
     public static final int CLEAR_BUTTON_SLOT = 25;
 
-    // Tool Modifier Button Slots
     public static final int TOGGLE_UNBREAKABLE_SLOT = 41;
     public static final int CYCLE_FORTUNE_SLOT = 42;
     public static final int ADD_DAMAGE_SLOT = 43;
@@ -58,6 +56,16 @@ public class CraftingGuiManager implements Listener {
         this.plugin = Objects.requireNonNull(plugin, "Plugin cannot be null");
         this.recipeRegistry = Objects.requireNonNull(recipeRegistry, "RecipeRegistry cannot be null");
         this.itemIdentifier = Objects.requireNonNull(itemIdentifier, "ItemIdentifierService cannot be null");
+    }
+
+    public int getResultSlot() {
+        return resultSlot;
+    }
+
+    public void setResultSlot(int resultSlot) {
+        if (resultSlot >= 0 && resultSlot < 54) {
+            this.resultSlot = resultSlot;
+        }
     }
 
     public void openCraftingGui(Player player) {
@@ -95,7 +103,7 @@ public class CraftingGuiManager implements Listener {
 
         Set<Integer> interactiveSlots = new HashSet<>();
         for (int slot : GRID_SLOTS) interactiveSlots.add(slot);
-        interactiveSlots.add(RESULT_SLOT);
+        interactiveSlots.add(resultSlot);
         interactiveSlots.add(CRAFT_BUTTON_SLOT);
         interactiveSlots.add(CLEAR_BUTTON_SLOT);
         interactiveSlots.add(TOGGLE_UNBREAKABLE_SLOT);
@@ -124,7 +132,7 @@ public class CraftingGuiManager implements Listener {
 
         Set<Integer> interactiveSlots = new HashSet<>();
         for (int slot : GRID_SLOTS) interactiveSlots.add(slot);
-        interactiveSlots.add(RESULT_SLOT);
+        interactiveSlots.add(resultSlot);
         interactiveSlots.add(CRAFT_BUTTON_SLOT);
         interactiveSlots.add(CLEAR_BUTTON_SLOT);
         interactiveSlots.add(TOGGLE_UNBREAKABLE_SLOT);
@@ -140,7 +148,6 @@ public class CraftingGuiManager implements Listener {
     }
 
     private void setupButtons(Inventory inv) {
-        // Craft Button
         ItemStack craftBtn = new ItemStack(Material.NETHER_STAR);
         ItemMeta cMeta = craftBtn.getItemMeta();
         if (cMeta != null) {
@@ -150,7 +157,6 @@ public class CraftingGuiManager implements Listener {
         }
         inv.setItem(CRAFT_BUTTON_SLOT, craftBtn);
 
-        // Clear Grid Button
         ItemStack clearBtn = new ItemStack(Material.BARRIER);
         ItemMeta clMeta = clearBtn.getItemMeta();
         if (clMeta != null) {
@@ -160,7 +166,6 @@ public class CraftingGuiManager implements Listener {
         }
         inv.setItem(CLEAR_BUTTON_SLOT, clearBtn);
 
-        // Tool Modifier: Toggle Unbreakable
         ItemStack unbBtn = new ItemStack(Material.ANVIL);
         ItemMeta unbMeta = unbBtn.getItemMeta();
         if (unbMeta != null) {
@@ -170,7 +175,6 @@ public class CraftingGuiManager implements Listener {
         }
         inv.setItem(TOGGLE_UNBREAKABLE_SLOT, unbBtn);
 
-        // Tool Modifier: Cycle Fortune
         ItemStack fortBtn = new ItemStack(Material.ENCHANTED_BOOK);
         ItemMeta fortMeta = fortBtn.getItemMeta();
         if (fortMeta != null) {
@@ -180,7 +184,6 @@ public class CraftingGuiManager implements Listener {
         }
         inv.setItem(CYCLE_FORTUNE_SLOT, fortBtn);
 
-        // Tool Modifier: Add Attack Damage
         ItemStack dmgBtn = new ItemStack(Material.DIAMOND_SWORD);
         ItemMeta dmgMeta = dmgBtn.getItemMeta();
         if (dmgMeta != null) {
@@ -190,7 +193,6 @@ public class CraftingGuiManager implements Listener {
         }
         inv.setItem(ADD_DAMAGE_SLOT, dmgBtn);
 
-        // Tool Modifier: Repair Durability
         ItemStack repBtn = new ItemStack(Material.EXPERIENCE_BOTTLE);
         ItemMeta repMeta = repBtn.getItemMeta();
         if (repMeta != null) {
@@ -222,7 +224,7 @@ public class CraftingGuiManager implements Listener {
                     evaluateAndCraft(player, topInv);
                 } else if (rawSlot == CLEAR_BUTTON_SLOT) {
                     clearGrid(player, topInv);
-                } else if (rawSlot == RESULT_SLOT) {
+                } else if (rawSlot == resultSlot) {
                     claimCraftedResult(player, topInv);
                 } else if (rawSlot == TOGGLE_UNBREAKABLE_SLOT) {
                     handleToggleUnbreakable(player, topInv);
@@ -260,7 +262,7 @@ public class CraftingGuiManager implements Listener {
     }
 
     private void handleToggleUnbreakable(Player player, Inventory inv) {
-        ItemStack result = inv.getItem(RESULT_SLOT);
+        ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
             player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
             return;
@@ -275,7 +277,7 @@ public class CraftingGuiManager implements Listener {
     }
 
     private void handleCycleFortune(Player player, Inventory inv) {
-        ItemStack result = inv.getItem(RESULT_SLOT);
+        ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
             player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
             return;
@@ -295,7 +297,7 @@ public class CraftingGuiManager implements Listener {
     }
 
     private void handleAddAttackDamage(Player player, Inventory inv) {
-        ItemStack result = inv.getItem(RESULT_SLOT);
+        ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
             player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
             return;
@@ -315,7 +317,7 @@ public class CraftingGuiManager implements Listener {
     }
 
     private void handleRepairDurability(Player player, Inventory inv) {
-        ItemStack result = inv.getItem(RESULT_SLOT);
+        ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
             player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
             return;
@@ -386,7 +388,7 @@ public class CraftingGuiManager implements Listener {
 
     private void clearGrid(Player player, Inventory inv) {
         returnGridItemsToPlayer(player, inv);
-        inv.setItem(RESULT_SLOT, null);
+        inv.setItem(resultSlot, null);
     }
 
     private void returnGridItemsToPlayer(Player player, Inventory inv) {
@@ -417,7 +419,7 @@ public class CraftingGuiManager implements Listener {
                     return;
                 }
                 ItemStack result = recipeRegistry.createIngredientItemStack(recipe.getResult());
-                inv.setItem(RESULT_SLOT, result);
+                inv.setItem(resultSlot, result);
                 player.sendMessage(Component.text("Recipe matched! Click the result to claim.", NamedTextColor.GREEN));
                 return;
             }
@@ -430,13 +432,13 @@ public class CraftingGuiManager implements Listener {
                     return;
                 }
                 ItemStack result = recipeRegistry.createIngredientItemStack(recipe.getResult());
-                inv.setItem(RESULT_SLOT, result);
+                inv.setItem(resultSlot, result);
                 player.sendMessage(Component.text("Recipe matched! Click the result to claim.", NamedTextColor.GREEN));
                 return;
             }
         }
 
-        inv.setItem(RESULT_SLOT, null);
+        inv.setItem(resultSlot, null);
         player.sendMessage(Component.text("No matching crafting recipe found.", NamedTextColor.RED));
     }
 
@@ -535,7 +537,7 @@ public class CraftingGuiManager implements Listener {
     }
 
     private void claimCraftedResult(Player player, Inventory inv) {
-        ItemStack result = inv.getItem(RESULT_SLOT);
+        ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
             return;
         }
@@ -556,7 +558,7 @@ public class CraftingGuiManager implements Listener {
         if (matchedShaped != null) {
             if (matchedShaped.getPermission() != null && !player.hasPermission(matchedShaped.getPermission())) {
                 player.sendMessage(Component.text("You do not have permission to craft this recipe.", NamedTextColor.RED));
-                inv.setItem(RESULT_SLOT, null);
+                inv.setItem(resultSlot, null);
                 return;
             }
 
@@ -608,7 +610,7 @@ public class CraftingGuiManager implements Listener {
             if (matchedShapeless != null) {
                 if (matchedShapeless.getPermission() != null && !player.hasPermission(matchedShapeless.getPermission())) {
                     player.sendMessage(Component.text("You do not have permission to craft this recipe.", NamedTextColor.RED));
-                    inv.setItem(RESULT_SLOT, null);
+                    inv.setItem(resultSlot, null);
                     return;
                 }
 
@@ -628,7 +630,7 @@ public class CraftingGuiManager implements Listener {
                     }
                 }
             } else {
-                inv.setItem(RESULT_SLOT, null);
+                inv.setItem(resultSlot, null);
                 return;
             }
         }
@@ -640,7 +642,7 @@ public class CraftingGuiManager implements Listener {
             }
         }
 
-        inv.setItem(RESULT_SLOT, null);
+        inv.setItem(resultSlot, null);
         player.sendMessage(Component.text("Successfully crafted item!", NamedTextColor.GREEN));
 
         evaluateAndCraft(player, inv);

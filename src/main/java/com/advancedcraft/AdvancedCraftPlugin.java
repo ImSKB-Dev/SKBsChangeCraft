@@ -82,6 +82,13 @@ public class AdvancedCraftPlugin extends JavaPlugin {
         boolean opBypass = getConfig().getBoolean("settings.op-bypass-permissions", true);
         permissionService.setOpBypassPermissions(opBypass);
 
+        File guiFile = new File(getDataFolder(), "gui.yml");
+        if (guiFile.exists()) {
+            YamlConfiguration guiConfig = YamlConfiguration.loadConfiguration(guiFile);
+            int resSlot = guiConfig.getInt("result-slot", 24);
+            guiManager.setResultSlot(resSlot);
+        }
+
         recipeRegistry.clear();
         actionManager.clear();
 

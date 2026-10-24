@@ -4,6 +4,7 @@ import com.advancedcraft.model.CustomIngredient;
 import com.advancedcraft.model.CustomItemDefinition;
 import com.advancedcraft.model.ShapedRecipeDefinition;
 import com.advancedcraft.model.ShapelessRecipeDefinition;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
@@ -11,6 +12,9 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.RecipeChoice;
+import org.bukkit.inventory.ShapedRecipe;
+import org.bukkit.inventory.ShapelessRecipe;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
@@ -18,7 +22,7 @@ import java.util.logging.Logger;
 
 /**
  * Registry for managing custom items and custom recipes.
- * Supports ingredient validation and recipe parsing from YAML configurations.
+ * Registers custom recipes with Bukkit's recipe manager so they work in standard vanilla Crafting Tables as well.
  */
 public class RecipeRegistry {
 
@@ -29,6 +33,7 @@ public class RecipeRegistry {
     private final Map<String, CustomItemDefinition> customItems = new HashMap<>();
     private final Map<String, ShapedRecipeDefinition> shapedRecipes = new HashMap<>();
     private final Map<String, ShapelessRecipeDefinition> shapelessRecipes = new HashMap<>();
+    private final Set<NamespacedKey> registeredBukkitRecipeKeys = new HashSet<>();
 
     public RecipeRegistry(Plugin plugin, ItemIdentifierService itemIdentifier) {
         this.plugin = Objects.requireNonNull(plugin, "Plugin cannot be null");
@@ -37,6 +42,14 @@ public class RecipeRegistry {
     }
 
     public void clear() {
+        // Unregister vanilla Bukkit recipes added by this plugin
+        for (NamespacedKey key : registeredBukkitRecipeKeys) {
+            try {
+                Bukkit.removeRecipe(key);
+            } catch (Throwable ignored) {}
+        }
+        registeredBukkitRecipeKeys.clear();
+
         customItems.clear();
         shapedRecipes.clear();
         shapelessRecipes.clear();
@@ -64,11 +77,79 @@ public class RecipeRegistry {
     public void registerShapedRecipe(ShapedRecipeDefinition recipe) {
         Objects.requireNonNull(recipe, "ShapedRecipeDefinition cannot be null");
         shapedRecipes.put(recipe.getId(), recipe);
+        registerBukkitShapedRecipe(recipe);
     }
 
     public void registerShapelessRecipe(ShapelessRecipeDefinition recipe) {
         Objects.requireNonNull(recipe, "ShapelessRecipeDefinition cannot be null");
         shapelessRecipes.put(recipe.getId(), recipe);
+        registerBukkitShapelessRecipe(recipe);
+    }
+
+    private void registerBukkitShapedRecipe(ShapedRecipeDefinition recipe) {
+        try {
+            ItemStack resultStack = createIngredientItemStack(recipe.getResult());
+            if (resultStack == null || resultStack.getType().isAir()) return;
+
+            NamespacedKey key = new NamespacedKey(plugin, "recipe_shaped_" + recipe.getId());
+            ShapedRecipe bukkitRecipe = new ShapedRecipe(key, resultStack);
+
+            List<String> shapeList = recipe.getShape();
+            bukkitRecipe.shape(shapeList.toArray(new String[0]));
+
+            for (Map.Entry<Character, CustomIngredient> entry : recipe.getIngredients().entrySet()) {
+                char ingredientChar = entry.getKey();
+                CustomIngredient ing = entry.getValue();
+
+                if (ing.getMode() == CustomIngredient.MatchingMode.CUSTOM_ITEM) {
+                    CustomItemDefinition customDef = customItems.get(ing.getCustomItemId());
+                    if (customDef != null) {
+                        ItemStack ingredientStack = itemIdentifier.createItemStack(customDef, ing.getAmount());
+                        bukkitRecipe.setIngredient(ingredientChar, new RecipeChoice.ExactChoice(ingredientStack));
+                    } else if (ing.getMaterial() != null) {
+                        bukkitRecipe.setIngredient(ingredientChar, ing.getMaterial());
+                    }
+                } else if (ing.getMaterial() != null) {
+                    bukkitRecipe.setIngredient(ingredientChar, ing.getMaterial());
+                }
+            }
+
+            Bukkit.addRecipe(bukkitRecipe);
+            registeredBukkitRecipeKeys.add(key);
+            logger.info("Registered vanilla crafting table shaped recipe: " + key.getKey());
+        } catch (Throwable e) {
+            logger.warning("Could not register Bukkit vanilla shaped recipe for " + recipe.getId() + ": " + e.getMessage());
+        }
+    }
+
+    private void registerBukkitShapelessRecipe(ShapelessRecipeDefinition recipe) {
+        try {
+            ItemStack resultStack = createIngredientItemStack(recipe.getResult());
+            if (resultStack == null || resultStack.getType().isAir()) return;
+
+            NamespacedKey key = new NamespacedKey(plugin, "recipe_shapeless_" + recipe.getId());
+            ShapelessRecipe bukkitRecipe = new ShapelessRecipe(key, resultStack);
+
+            for (CustomIngredient ing : recipe.getIngredients()) {
+                if (ing.getMode() == CustomIngredient.MatchingMode.CUSTOM_ITEM) {
+                    CustomItemDefinition customDef = customItems.get(ing.getCustomItemId());
+                    if (customDef != null) {
+                        ItemStack ingredientStack = itemIdentifier.createItemStack(customDef, ing.getAmount());
+                        bukkitRecipe.addIngredient(new RecipeChoice.ExactChoice(ingredientStack));
+                    } else if (ing.getMaterial() != null) {
+                        bukkitRecipe.addIngredient(ing.getMaterial());
+                    }
+                } else if (ing.getMaterial() != null) {
+                    bukkitRecipe.addIngredient(ing.getMaterial());
+                }
+            }
+
+            Bukkit.addRecipe(bukkitRecipe);
+            registeredBukkitRecipeKeys.add(key);
+            logger.info("Registered vanilla crafting table shapeless recipe: " + key.getKey());
+        } catch (Throwable e) {
+            logger.warning("Could not register Bukkit vanilla shapeless recipe for " + recipe.getId() + ": " + e.getMessage());
+        }
     }
 
     public Map<String, ShapedRecipeDefinition> getShapedRecipes() {
