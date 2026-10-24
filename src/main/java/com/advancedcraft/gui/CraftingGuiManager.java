@@ -29,7 +29,8 @@ import java.util.*;
 
 /**
  * Manages the custom crafting GUI and handles secure inventory interactions.
- * Configurable result slot allowing server administrators to choose where the output item is located.
+ * Allows custom item placement into the result slot, obeying and preserving all NBT tags,
+ * display names, lore, enchantments, and persistent metadata.
  */
 public class CraftingGuiManager implements Listener {
 
@@ -170,7 +171,7 @@ public class CraftingGuiManager implements Listener {
         ItemMeta unbMeta = unbBtn.getItemMeta();
         if (unbMeta != null) {
             unbMeta.displayName(miniMessage.deserialize("<gold><bold>Toggle Unbreakable</bold></gold>"));
-            unbMeta.lore(List.of(miniMessage.deserialize("<gray>Toggle unbreakable status on crafted result item.</gray>")));
+            unbMeta.lore(List.of(miniMessage.deserialize("<gray>Toggle unbreakable status on result item.</gray>")));
             unbBtn.setItemMeta(unbMeta);
         }
         inv.setItem(TOGGLE_UNBREAKABLE_SLOT, unbBtn);
@@ -216,16 +217,15 @@ public class CraftingGuiManager implements Listener {
 
         if (rawSlot < topInv.getSize()) {
             boolean isGridSlot = isGridSlot(rawSlot);
+            boolean isResultSlot = (rawSlot == resultSlot);
 
-            if (!isGridSlot) {
+            if (!isGridSlot && !isResultSlot) {
                 event.setCancelled(true);
 
                 if (rawSlot == CRAFT_BUTTON_SLOT) {
                     evaluateAndCraft(player, topInv);
                 } else if (rawSlot == CLEAR_BUTTON_SLOT) {
                     clearGrid(player, topInv);
-                } else if (rawSlot == resultSlot) {
-                    claimCraftedResult(player, topInv);
                 } else if (rawSlot == TOGGLE_UNBREAKABLE_SLOT) {
                     handleToggleUnbreakable(player, topInv);
                 } else if (rawSlot == CYCLE_FORTUNE_SLOT) {
@@ -236,6 +236,18 @@ public class CraftingGuiManager implements Listener {
                     handleRepairDurability(player, topInv);
                 }
                 return;
+            }
+
+            // If player interacts with resultSlot directly
+            if (isResultSlot) {
+                // If grid has matched a recipe, claim crafted result
+                if (hasRecipeMatched(topInv)) {
+                    claimCraftedResult(player, topInv);
+                    event.setCancelled(true);
+                } else {
+                    // Allow player to manually place/pick up custom result items with full NBT/metadata preservation
+                    // Uncancelled: standard Bukkit slot placing/taking happens naturally
+                }
             }
         }
 
@@ -249,22 +261,43 @@ public class CraftingGuiManager implements Listener {
         }
 
         if (event.getClick() == ClickType.NUMBER_KEY && rawSlot < topInv.getSize()) {
-            if (!isGridSlot(rawSlot)) {
+            if (!isGridSlot(rawSlot) && rawSlot != resultSlot) {
                 event.setCancelled(true);
             }
         }
 
         if (event.getClick() == ClickType.SWAP_OFFHAND && rawSlot < topInv.getSize()) {
-            if (!isGridSlot(rawSlot)) {
+            if (!isGridSlot(rawSlot) && rawSlot != resultSlot) {
                 event.setCancelled(true);
             }
         }
     }
 
+    private boolean hasRecipeMatched(Inventory inv) {
+        ItemStack[] gridItems = new ItemStack[9];
+        for (int i = 0; i < 9; i++) {
+            gridItems[i] = inv.getItem(GRID_SLOTS[i]);
+        }
+
+        for (ShapedRecipeDefinition recipe : recipeRegistry.getShapedRecipes().values()) {
+            if (matchShapedRecipe(gridItems, recipe)) {
+                return true;
+            }
+        }
+
+        for (ShapelessRecipeDefinition recipe : recipeRegistry.getShapelessRecipes().values()) {
+            if (matchShapelessRecipe(gridItems, recipe)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void handleToggleUnbreakable(Player player, Inventory inv) {
         ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
-            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("No result item in output slot to modify.", NamedTextColor.YELLOW));
             return;
         }
         ItemMeta meta = result.getItemMeta();
@@ -279,7 +312,7 @@ public class CraftingGuiManager implements Listener {
     private void handleCycleFortune(Player player, Inventory inv) {
         ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
-            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("No result item in output slot to modify.", NamedTextColor.YELLOW));
             return;
         }
         ItemMeta meta = result.getItemMeta();
@@ -299,7 +332,7 @@ public class CraftingGuiManager implements Listener {
     private void handleAddAttackDamage(Player player, Inventory inv) {
         ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
-            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("No result item in output slot to modify.", NamedTextColor.YELLOW));
             return;
         }
         ItemMeta meta = result.getItemMeta();
@@ -319,7 +352,7 @@ public class CraftingGuiManager implements Listener {
     private void handleRepairDurability(Player player, Inventory inv) {
         ItemStack result = inv.getItem(resultSlot);
         if (result == null || result.getType().isAir()) {
-            player.sendMessage(Component.text("No crafted result item to modify.", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("No result item in output slot to modify.", NamedTextColor.YELLOW));
             return;
         }
         ItemMeta meta = result.getItemMeta();
@@ -342,7 +375,7 @@ public class CraftingGuiManager implements Listener {
 
         Inventory topInv = event.getView().getTopInventory();
         for (int slot : event.getRawSlots()) {
-            if (slot < topInv.getSize() && !isGridSlot(slot)) {
+            if (slot < topInv.getSize() && !isGridSlot(slot) && slot != resultSlot) {
                 event.setCancelled(true);
                 return;
             }
@@ -438,7 +471,6 @@ public class CraftingGuiManager implements Listener {
             }
         }
 
-        inv.setItem(resultSlot, null);
         player.sendMessage(Component.text("No matching crafting recipe found.", NamedTextColor.RED));
     }
 
@@ -629,12 +661,10 @@ public class CraftingGuiManager implements Listener {
                         }
                     }
                 }
-            } else {
-                inv.setItem(resultSlot, null);
-                return;
             }
         }
 
+        // Preserve exact ItemStack metadata, NBT tags, name, lore, and enchantments when giving item to player
         HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(result.clone());
         if (!leftover.isEmpty()) {
             for (ItemStack drop : leftover.values()) {
