@@ -73,6 +73,7 @@ public class CraftingGuiManager implements Listener {
         Inventory inv = Bukkit.createInventory(null, 54, miniMessage.deserialize(GUI_TITLE));
         fillDecorativeGlass(inv);
         setupButtons(inv);
+        validateGui(inv);
         openGuiSessions.add(player.getUniqueId());
         player.openInventory(inv);
     }
@@ -421,11 +422,22 @@ public class CraftingGuiManager implements Listener {
 
     private void clearGrid(Player player, Inventory inv) {
         returnGridItemsToPlayer(player, inv);
-        inv.setItem(resultSlot, null);
     }
 
     private void returnGridItemsToPlayer(Player player, Inventory inv) {
+        List<Integer> slotsToReturn = new ArrayList<>();
         for (int slot : GRID_SLOTS) {
+            slotsToReturn.add(slot);
+        }
+
+        ItemStack res = inv.getItem(resultSlot);
+        if (res != null && !res.getType().isAir() && !isPreviewItem(res)) {
+            slotsToReturn.add(resultSlot);
+        } else {
+            inv.setItem(resultSlot, null);
+        }
+
+        for (int slot : slotsToReturn) {
             ItemStack item = inv.getItem(slot);
             if (item != null && !item.getType().isAir()) {
                 HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(item);
@@ -436,6 +448,32 @@ public class CraftingGuiManager implements Listener {
                 }
                 inv.setItem(slot, null);
             }
+        }
+    }
+
+    private boolean isPreviewItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "gui_preview");
+        return item.getItemMeta().getPersistentDataContainer().has(key, org.bukkit.persistence.PersistentDataType.BYTE);
+    }
+
+    private void markAsPreviewItem(ItemStack item) {
+        if (item == null) return;
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "gui_preview");
+            meta.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+    }
+
+    private void stripPreviewMark(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return;
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "gui_preview");
+            meta.getPersistentDataContainer().remove(key);
+            item.setItemMeta(meta);
         }
     }
 
@@ -452,6 +490,7 @@ public class CraftingGuiManager implements Listener {
                     return;
                 }
                 ItemStack result = recipeRegistry.createIngredientItemStack(recipe.getResult());
+                markAsPreviewItem(result);
                 inv.setItem(resultSlot, result);
                 player.sendMessage(Component.text("Recipe matched! Click the result to claim.", NamedTextColor.GREEN));
                 return;
@@ -664,8 +703,12 @@ public class CraftingGuiManager implements Listener {
             }
         }
 
+        // Clean preview tag before giving item to player
+        ItemStack claimItem = result.clone();
+        stripPreviewMark(claimItem);
+
         // Preserve exact ItemStack metadata, NBT tags, name, lore, and enchantments when giving item to player
-        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(result.clone());
+        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(claimItem);
         if (!leftover.isEmpty()) {
             for (ItemStack drop : leftover.values()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), drop);
