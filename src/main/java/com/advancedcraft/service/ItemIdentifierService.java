@@ -58,6 +58,18 @@ public class ItemIdentifierService {
     /**
      * Checks whether an ItemStack matches a specific registered custom item ID.
      */
+    /**
+     * Tags an existing ItemStack with a custom item ID in its PDC.
+     */
+    public void setCustomItemId(ItemStack itemStack, String customId) {
+        if (itemStack == null || customId == null) return;
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(customItemKey, PersistentDataType.STRING, customId.toLowerCase(Locale.ROOT));
+            itemStack.setItemMeta(meta);
+        }
+    }
+
     public boolean isCustomItem(ItemStack itemStack, String expectedId) {
         if (expectedId == null) {
             return false;

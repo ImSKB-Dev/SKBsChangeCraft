@@ -191,4 +191,24 @@ class AdvancedCraftUnitTest {
         assertEquals("advancedcraft.craft.ruby_sword", recipe.getPermission());
         assertEquals(3, recipe.getShape().size());
     }
+
+    @Test
+    void testDynamicRecipeRegistrationAndRetrieval() {
+        RecipeRegistry registry = new RecipeRegistry(plugin, Mockito.mock(ItemIdentifierService.class));
+
+        ShapedRecipeDefinition shapedDef = new ShapedRecipeDefinition(
+                "dynamic_shaped",
+                List.of(" D ", " S ", " S "),
+                Map.of(
+                        'D', CustomIngredient.ofMaterial(Material.DIAMOND, 1),
+                        'S', CustomIngredient.ofMaterial(Material.STICK, 1)
+                ),
+                CustomIngredient.ofMaterial(Material.DIAMOND_SWORD, 1),
+                null
+        );
+
+        registry.registerShapedRecipe(shapedDef);
+        assertTrue(registry.getShapedRecipes().containsKey("dynamic_shaped"));
+        assertEquals("dynamic_shaped", registry.getShapedRecipes().get("dynamic_shaped").getId());
+    }
 }

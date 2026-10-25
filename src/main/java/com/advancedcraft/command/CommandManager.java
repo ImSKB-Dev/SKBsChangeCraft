@@ -82,6 +82,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
                 case "give" -> handleGive(sender, args);
                 case "remove" -> handleRemoveItem(sender, args);
                 case "items" -> handleItems(sender);
+                case "addrecipe" -> handleAddRecipe(sender, args);
                 case "recipes" -> handleRecipes(sender);
                 case "recipe" -> handleRecipeInfo(sender, args);
                 case "reload" -> handleReload(sender);
@@ -154,6 +155,39 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 
         sender.sendMessage(Component.text("Gave " + amount + "x " + itemId + " to " + target.getName() + ".", NamedTextColor.GREEN));
         target.sendMessage(Component.text("You received " + amount + "x " + itemId + ".", NamedTextColor.GREEN));
+    }
+
+    private void handleAddRecipe(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Console cannot save recipes from GUI grid.", NamedTextColor.RED));
+            return;
+        }
+
+        if (!permissionService.hasPermission(player, "advancedcraft.addrecipe") && !permissionService.hasPermission(player, "advancedcraft.admin")) {
+            player.sendMessage(Component.text("You do not have permission to add custom recipes.", NamedTextColor.RED));
+            return;
+        }
+
+        if (args.length < 2) {
+            player.sendMessage(Component.text("Usage: /customcraft addrecipe <recipeId> [shaped|shapeless]", NamedTextColor.YELLOW));
+            return;
+        }
+
+        String recipeId = args[1].toLowerCase(Locale.ROOT);
+        String typeStr = args.length >= 3 ? args[2].toUpperCase(Locale.ROOT) : "SHAPED";
+
+        if (!typeStr.equals("SHAPED") && !typeStr.equals("SHAPELESS")) {
+            player.sendMessage(Component.text("Recipe type must be 'shaped' or 'shapeless'.", NamedTextColor.RED));
+            return;
+        }
+
+        org.bukkit.inventory.Inventory topInv = player.getOpenInventory().getTopInventory();
+        if (topInv == null || !guiManager.validateGui(topInv)) {
+            player.sendMessage(Component.text("Please open the crafting GUI (/craft) and set up your grid and result item before running this command.", NamedTextColor.RED));
+            return;
+        }
+
+        guiManager.saveRecipeFromGui(player, topInv, recipeId, typeStr);
     }
 
     private void handleRemoveItem(CommandSender sender, String[] args) {
@@ -259,6 +293,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== AdvancedCraft Help ===", NamedTextColor.GOLD));
         sender.sendMessage(Component.text("/craft or /customcraft menu - Open Crafting GUI", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/customcraft addrecipe <recipeId> [shaped|shapeless] - Save active GUI grid as a recipe", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/customcraft give <player> <itemId> [amount] - Give custom item", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/customcraft remove <itemId> - Remove registered custom item", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/customcraft items - List registered custom items", NamedTextColor.YELLOW));
@@ -277,7 +312,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 1) {
-            List<String> subcommands = List.of("menu", "give", "remove", "items", "recipes", "recipe", "reload", "version", "lore");
+            List<String> subcommands = List.of("menu", "addrecipe", "give", "remove", "items", "recipes", "recipe", "reload", "version", "lore");
             return filterPrefix(subcommands, args[0]);
         }
 
@@ -297,9 +332,15 @@ public class CommandManager implements CommandExecutor, TabCompleter {
                 recipes.addAll(recipeRegistry.getShapedRecipes().keySet());
                 recipes.addAll(recipeRegistry.getShapelessRecipes().keySet());
                 return filterPrefix(recipes, args[1]);
+            } else if (sub.equals("addrecipe")) {
+                return Collections.emptyList();
             } else if (sub.equals("lore")) {
                 return loreCommandExecutor.onTabComplete(sender, command, alias, Arrays.copyOfRange(args, 1, args.length));
             }
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("addrecipe")) {
+            return filterPrefix(List.of("shaped", "shapeless"), args[2]);
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("give")) {

@@ -46,6 +46,7 @@ public class CraftingGuiManager implements Listener {
     public static final int CRAFT_BUTTON_SLOT = 23;
     public static final int CLEAR_BUTTON_SLOT = 25;
 
+    public static final int SAVE_RECIPE_SLOT = 40;
     public static final int TOGGLE_UNBREAKABLE_SLOT = 41;
     public static final int CYCLE_FORTUNE_SLOT = 42;
     public static final int ADD_DAMAGE_SLOT = 43;
@@ -108,6 +109,7 @@ public class CraftingGuiManager implements Listener {
         interactiveSlots.add(resultSlot);
         interactiveSlots.add(CRAFT_BUTTON_SLOT);
         interactiveSlots.add(CLEAR_BUTTON_SLOT);
+        interactiveSlots.add(SAVE_RECIPE_SLOT);
         interactiveSlots.add(TOGGLE_UNBREAKABLE_SLOT);
         interactiveSlots.add(CYCLE_FORTUNE_SLOT);
         interactiveSlots.add(ADD_DAMAGE_SLOT);
@@ -168,6 +170,15 @@ public class CraftingGuiManager implements Listener {
         }
         inv.setItem(CLEAR_BUTTON_SLOT, clearBtn);
 
+        ItemStack saveBtn = new ItemStack(Material.CRAFTING_TABLE);
+        ItemMeta saveMeta = saveBtn.getItemMeta();
+        if (saveMeta != null) {
+            saveMeta.displayName(miniMessage.deserialize("<green><bold>Save as New Recipe</bold></green>"));
+            saveMeta.lore(List.of(miniMessage.deserialize("<gray>Save current grid & result as a new custom recipe.</gray>")));
+            saveBtn.setItemMeta(saveMeta);
+        }
+        inv.setItem(SAVE_RECIPE_SLOT, saveBtn);
+
         ItemStack unbBtn = new ItemStack(Material.ANVIL);
         ItemMeta unbMeta = unbBtn.getItemMeta();
         if (unbMeta != null) {
@@ -227,6 +238,8 @@ public class CraftingGuiManager implements Listener {
                     evaluateAndCraft(player, topInv);
                 } else if (rawSlot == CLEAR_BUTTON_SLOT) {
                     clearGrid(player, topInv);
+                } else if (rawSlot == SAVE_RECIPE_SLOT) {
+                    handleSaveRecipeClick(player, topInv);
                 } else if (rawSlot == TOGGLE_UNBREAKABLE_SLOT) {
                     handleToggleUnbreakable(player, topInv);
                 } else if (rawSlot == CYCLE_FORTUNE_SLOT) {
@@ -293,6 +306,146 @@ public class CraftingGuiManager implements Listener {
         }
 
         return false;
+    }
+
+    private void handleSaveRecipeClick(Player player, Inventory inv) {
+        if (!player.hasPermission("advancedcraft.addrecipe") && !player.hasPermission("advancedcraft.admin")) {
+            player.sendMessage(Component.text("You do not have permission to save new recipes.", NamedTextColor.RED));
+            return;
+        }
+        String generatedRecipeId = "recipe_" + System.currentTimeMillis() / 1000L;
+        saveRecipeFromGui(player, inv, generatedRecipeId, "SHAPED");
+    }
+
+    public boolean saveRecipeFromGui(Player player, Inventory inv, String recipeId, String typeStr) {
+        ItemStack resultStack = inv.getItem(resultSlot);
+        if (resultStack == null || resultStack.getType().isAir() || isPreviewItem(resultStack)) {
+            player.sendMessage(Component.text("Please place the target result item into the output slot first.", NamedTextColor.RED));
+            return false;
+        }
+
+        boolean gridHasItems = false;
+        for (int slot : GRID_SLOTS) {
+            ItemStack item = inv.getItem(slot);
+            if (item != null && !item.getType().isAir()) {
+                gridHasItems = true;
+                break;
+            }
+        }
+
+        if (!gridHasItems) {
+            player.sendMessage(Component.text("Crafting grid is empty. Place ingredient items into the grid.", NamedTextColor.RED));
+            return false;
+        }
+
+        // Determine result CustomIngredient or auto-register CustomItem if it has custom metadata
+        CustomIngredient resultIngredient;
+        Optional<String> customIdOpt = itemIdentifier.getCustomItemId(resultStack);
+        if (customIdOpt.isPresent()) {
+            resultIngredient = CustomIngredient.ofCustomItem(customIdOpt.get(), resultStack.getAmount());
+        } else {
+            // Check if result stack has display name, lore, enchantments, or unbreakable
+            ItemMeta meta = resultStack.getItemMeta();
+            boolean hasCustomName = meta != null && meta.hasDisplayName();
+            boolean hasLore = meta != null && meta.hasLore();
+            boolean hasEnchants = meta != null && meta.hasEnchants();
+            boolean isUnbreakable = meta != null && meta.isUnbreakable();
+
+            if (hasCustomName || hasLore || hasEnchants || isUnbreakable) {
+                String customItemId = "custom_" + recipeId;
+                List<String> loreList = new ArrayList<>();
+                if (meta.hasLore() && meta.getLore() != null) {
+                    loreList.addAll(meta.getLore());
+                }
+
+                String customName = meta.hasDisplayName() ? meta.getDisplayName() : null;
+
+                com.advancedcraft.model.CustomItemDefinition newCustomItem = new com.advancedcraft.model.CustomItemDefinition(
+                        customItemId,
+                        resultStack.getType(),
+                        customName,
+                        loreList,
+                        meta.hasCustomModelData() ? meta.getCustomModelData() : null,
+                        meta.getEnchants(),
+                        meta.getItemFlags(),
+                        isUnbreakable,
+                        null, null,
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        null, null
+                );
+
+                itemIdentifier.setCustomItemId(resultStack, customItemId);
+                recipeRegistry.saveAndRegisterCustomItem(newCustomItem);
+                resultIngredient = CustomIngredient.ofCustomItem(customItemId, resultStack.getAmount());
+            } else {
+                resultIngredient = CustomIngredient.ofMaterial(resultStack.getType(), resultStack.getAmount());
+            }
+        }
+
+        boolean isShapeless = "SHAPELESS".equalsIgnoreCase(typeStr);
+
+        if (isShapeless) {
+            List<CustomIngredient> ingredients = new ArrayList<>();
+            for (int slot : GRID_SLOTS) {
+                ItemStack item = inv.getItem(slot);
+                if (item != null && !item.getType().isAir()) {
+                    Optional<String> ingCustomId = itemIdentifier.getCustomItemId(item);
+                    if (ingCustomId.isPresent()) {
+                        ingredients.add(CustomIngredient.ofCustomItem(ingCustomId.get(), item.getAmount()));
+                    } else {
+                        ingredients.add(CustomIngredient.ofMaterial(item.getType(), item.getAmount()));
+                    }
+                }
+            }
+
+            ShapelessRecipeDefinition shapelessDef = new ShapelessRecipeDefinition(
+                    recipeId, ingredients, resultIngredient, null
+            );
+            recipeRegistry.saveAndRegisterShapelessRecipe(shapelessDef);
+            player.sendMessage(Component.text("Successfully created and saved shapeless recipe: " + recipeId, NamedTextColor.GREEN));
+            return true;
+        } else {
+            Map<Character, CustomIngredient> ingMap = new HashMap<>();
+            Map<String, Character> ingredientToChar = new HashMap<>();
+            char currentChar = 'A';
+
+            List<String> shape = new ArrayList<>();
+            for (int row = 0; row < 3; row++) {
+                StringBuilder rowStr = new StringBuilder();
+                for (int col = 0; col < 3; col++) {
+                    int slotIndex = GRID_SLOTS[row * 3 + col];
+                    ItemStack item = inv.getItem(slotIndex);
+                    if (item == null || item.getType().isAir()) {
+                        rowStr.append(' ');
+                    } else {
+                        Optional<String> ingCustomId = itemIdentifier.getCustomItemId(item);
+                        String keyKey = ingCustomId.map(s -> "CUSTOM:" + s).orElseGet(() -> "MAT:" + item.getType().name());
+
+                        Character mappedChar = ingredientToChar.get(keyKey);
+                        if (mappedChar == null) {
+                            mappedChar = currentChar;
+                            ingredientToChar.put(keyKey, mappedChar);
+                            if (ingCustomId.isPresent()) {
+                                ingMap.put(mappedChar, CustomIngredient.ofCustomItem(ingCustomId.get(), item.getAmount()));
+                            } else {
+                                ingMap.put(mappedChar, CustomIngredient.ofMaterial(item.getType(), item.getAmount()));
+                            }
+                            currentChar++;
+                        }
+                        rowStr.append(mappedChar);
+                    }
+                }
+                shape.add(rowStr.toString());
+            }
+
+            ShapedRecipeDefinition shapedDef = new ShapedRecipeDefinition(
+                    recipeId, shape, ingMap, resultIngredient, null
+            );
+            recipeRegistry.saveAndRegisterShapedRecipe(shapedDef);
+            player.sendMessage(Component.text("Successfully created and saved shaped recipe: " + recipeId, NamedTextColor.GREEN));
+            return true;
+        }
     }
 
     private void handleToggleUnbreakable(Player player, Inventory inv) {

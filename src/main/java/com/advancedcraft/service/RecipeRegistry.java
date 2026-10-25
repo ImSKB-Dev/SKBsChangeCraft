@@ -86,6 +86,146 @@ public class RecipeRegistry {
         registerBukkitShapelessRecipe(recipe);
     }
 
+    public void saveAndRegisterCustomItem(CustomItemDefinition item) {
+        registerCustomItem(item);
+        org.bukkit.configuration.file.YamlConfiguration config;
+        java.io.File file = new java.io.File(plugin.getDataFolder(), "items.yml");
+        if (file.exists()) {
+            config = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+        } else {
+            config = new org.bukkit.configuration.file.YamlConfiguration();
+        }
+
+        String path = "items." + item.getId();
+        config.set(path + ".material", item.getMaterial().name());
+        if (item.getName() != null) config.set(path + ".name", item.getName());
+        if (!item.getLore().isEmpty()) config.set(path + ".lore", item.getLore());
+        if (item.getCustomModelData() != null) config.set(path + ".custom-model-data", item.getCustomModelData());
+        if (item.isUnbreakable()) config.set(path + ".unbreakable", true);
+
+        if (!item.getEnchantments().isEmpty()) {
+            for (Map.Entry<Enchantment, Integer> entry : item.getEnchantments().entrySet()) {
+                config.set(path + ".enchantments." + entry.getKey().getKey().getKey(), entry.getValue());
+            }
+        }
+
+        if (!item.getItemFlags().isEmpty()) {
+            List<String> flags = new ArrayList<>();
+            for (ItemFlag flag : item.getItemFlags()) flags.add(flag.name());
+            config.set(path + ".item-flags", flags);
+        }
+
+        try {
+            config.save(file);
+            logger.info("Saved custom item '" + item.getId() + "' to items.yml");
+        } catch (java.io.IOException e) {
+            logger.severe("Failed to save custom item '" + item.getId() + "' to items.yml: " + e.getMessage());
+        }
+    }
+
+    public void saveAndRegisterShapedRecipe(ShapedRecipeDefinition recipe) {
+        registerShapedRecipe(recipe);
+        saveShapedRecipeToConfig(recipe);
+    }
+
+    public void saveAndRegisterShapelessRecipe(ShapelessRecipeDefinition recipe) {
+        registerShapelessRecipe(recipe);
+        saveShapelessRecipeToConfig(recipe);
+    }
+
+    private void saveShapedRecipeToConfig(ShapedRecipeDefinition recipe) {
+        org.bukkit.configuration.file.YamlConfiguration config;
+        java.io.File file = new java.io.File(plugin.getDataFolder(), "recipes.yml");
+        if (file.exists()) {
+            config = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+        } else {
+            config = new org.bukkit.configuration.file.YamlConfiguration();
+        }
+
+        String path = "recipes." + recipe.getId();
+        config.set(path + ".type", "SHAPED");
+        if (recipe.getPermission() != null) config.set(path + ".permission", recipe.getPermission());
+        config.set(path + ".shape", recipe.getShape());
+
+        for (Map.Entry<Character, CustomIngredient> entry : recipe.getIngredients().entrySet()) {
+            String ingPath = path + ".ingredients." + entry.getKey();
+            CustomIngredient ing = entry.getValue();
+            if (ing.getMode() == CustomIngredient.MatchingMode.CUSTOM_ITEM) {
+                config.set(ingPath + ".type", "CUSTOM_ITEM");
+                config.set(ingPath + ".id", ing.getCustomItemId());
+            } else {
+                config.set(ingPath + ".type", "MATERIAL");
+                config.set(ingPath + ".material", ing.getMaterial().name());
+            }
+            config.set(ingPath + ".amount", ing.getAmount());
+        }
+
+        String resPath = path + ".result";
+        CustomIngredient res = recipe.getResult();
+        if (res.getMode() == CustomIngredient.MatchingMode.CUSTOM_ITEM) {
+            config.set(resPath + ".type", "CUSTOM_ITEM");
+            config.set(resPath + ".id", res.getCustomItemId());
+        } else {
+            config.set(resPath + ".type", "MATERIAL");
+            config.set(resPath + ".material", res.getMaterial().name());
+        }
+        config.set(resPath + ".amount", res.getAmount());
+
+        try {
+            config.save(file);
+            logger.info("Saved shaped recipe '" + recipe.getId() + "' to recipes.yml");
+        } catch (java.io.IOException e) {
+            logger.severe("Failed to save shaped recipe '" + recipe.getId() + "' to recipes.yml: " + e.getMessage());
+        }
+    }
+
+    private void saveShapelessRecipeToConfig(ShapelessRecipeDefinition recipe) {
+        org.bukkit.configuration.file.YamlConfiguration config;
+        java.io.File file = new java.io.File(plugin.getDataFolder(), "recipes.yml");
+        if (file.exists()) {
+            config = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+        } else {
+            config = new org.bukkit.configuration.file.YamlConfiguration();
+        }
+
+        String path = "recipes." + recipe.getId();
+        config.set(path + ".type", "SHAPELESS");
+        if (recipe.getPermission() != null) config.set(path + ".permission", recipe.getPermission());
+
+        List<Map<String, Object>> ingList = new ArrayList<>();
+        for (CustomIngredient ing : recipe.getIngredients()) {
+            Map<String, Object> ingMap = new HashMap<>();
+            if (ing.getMode() == CustomIngredient.MatchingMode.CUSTOM_ITEM) {
+                ingMap.put("type", "CUSTOM_ITEM");
+                ingMap.put("id", ing.getCustomItemId());
+            } else {
+                ingMap.put("type", "MATERIAL");
+                ingMap.put("material", ing.getMaterial().name());
+            }
+            ingMap.put("amount", ing.getAmount());
+            ingList.add(ingMap);
+        }
+        config.set(path + ".ingredients", ingList);
+
+        String resPath = path + ".result";
+        CustomIngredient res = recipe.getResult();
+        if (res.getMode() == CustomIngredient.MatchingMode.CUSTOM_ITEM) {
+            config.set(resPath + ".type", "CUSTOM_ITEM");
+            config.set(resPath + ".id", res.getCustomItemId());
+        } else {
+            config.set(resPath + ".type", "MATERIAL");
+            config.set(resPath + ".material", res.getMaterial().name());
+        }
+        config.set(resPath + ".amount", res.getAmount());
+
+        try {
+            config.save(file);
+            logger.info("Saved shapeless recipe '" + recipe.getId() + "' to recipes.yml");
+        } catch (java.io.IOException e) {
+            logger.severe("Failed to save shapeless recipe '" + recipe.getId() + "' to recipes.yml: " + e.getMessage());
+        }
+    }
+
     private void registerBukkitShapedRecipe(ShapedRecipeDefinition recipe) {
         try {
             ItemStack resultStack = createIngredientItemStack(recipe.getResult());
